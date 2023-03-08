@@ -17,8 +17,8 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import torch.nn.functional as nnF
-from util.box_ops import box_xyxy_to_cxcywh, poly_xy_to_cxcyxy
-from util.misc import interpolate
+# from util.box_ops import box_xyxy_to_cxcywh, poly_xy_to_cxcyxy
+# from util.misc import interpolate
 import cv2
 import numpy as np
 import math
