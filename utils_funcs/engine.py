@@ -6,9 +6,10 @@ import time
 import torch
 import torchvision.models.detection.mask_rcnn
 from utils_funcs.coco_eval import CocoEvaluator
-from utils.coco_utils import get_coco_api_from_dataset
-from utils_funcs import utils, transforms
-from utils.visualize import plot_log_per_epoch
+from utils.utils import get_coco_api_from_dataset
+from utils_funcs import transforms
+from utils import utils
+from utils.utils import plot_log_per_epoch
 
 
 def train_one_epoch(model, optimizer, data_loader, resolution, device, epoch, print_freq, log_dir, scaler=None):

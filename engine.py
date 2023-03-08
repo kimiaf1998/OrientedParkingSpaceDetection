@@ -17,7 +17,7 @@ from typing import Iterable
 import copy
 
 import torch
-import util.misc as utils
+from utils import utils
 from utils import RotatedCocoEvaluator, transforms
 from utils import PanopticEvaluator
 from utils.coco_utils import get_coco_api_from_dataset

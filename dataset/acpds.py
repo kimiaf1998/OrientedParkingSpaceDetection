@@ -2,17 +2,15 @@ import json
 from time import time
 import multiprocessing as mp
 
-import numpy
 import torch
 import torchvision
-import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
 from torch.utils.data import DataLoader
 from functools import lru_cache
 
-from models.utils.pooling import convert_points_2_two, calculate_rectangular_coordinates, convert_points_8xy
-from utils_funcs import utils
+from models.utils.pooling import convert_points_8xy
+from utils import utils
 
 
 class ACPDS():
