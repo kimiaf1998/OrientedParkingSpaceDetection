@@ -18,8 +18,9 @@ import copy
 
 import torch
 from utils import utils
-from utils import RotatedCocoEvaluator, transforms
-from utils import PanopticEvaluator
+from utils import transforms
+from utils.rotated_coco_eval import RotatedCocoEvaluator
+# from utils import PanopticEvaluator
 from utils.coco_utils import get_coco_api_from_dataset
 from utils.data_prefetcher import data_prefetcher
 from utils.visualize import plot_log_per_epoch
