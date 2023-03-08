@@ -19,11 +19,11 @@ import contextlib
 import copy
 import numpy as np
 import torch
-from util.box_ops import polygon_box_iou
+from utils.box_ops import polygon_box_iou
 from pycocotools.cocoeval import COCOeval
 from pycocotools.coco import COCO
 import pycocotools.mask as mask_util
-from util.misc import all_gather
+from utils.misc import all_gather
 
 
 class CocoEvaluator(object):
