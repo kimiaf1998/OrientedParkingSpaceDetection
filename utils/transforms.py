@@ -17,7 +17,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import torch.nn.functional as nnF
-from utils.box_ops import box_xyxy_to_cxcywh, poly_xy_to_cxcyxy
+from utils.box_ops import box_xyxy_to_cxcywh
 from utils.misc import interpolate
 import cv2
 import numpy as np
@@ -329,7 +329,7 @@ class Normalize(object):
         
         if "polys" in target:
             polys = target["polys"]
-            # polys = poly_xy_to_cxcyxy(polys)
+            polys = poly_xy_to_cxcyxy(polys)
             polys = polys / torch.tensor([ w, h, w, h, w, h, w, h], dtype=torch.float32)
             target["polys"] = polys
 
