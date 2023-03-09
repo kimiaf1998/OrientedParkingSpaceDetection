@@ -45,8 +45,10 @@ class FasterRCNN_FPN(nn.Module):
         # Extract features from the backbone
         features = self.backbone(x)
 
+        image_shapes = [(image.shape[1], image.shape[2]) for image in x]
+
         # Generate features for each ROI
-        rois = self.roi_pooling(features, boxes)
+        rois = self.roi_pooling(features, boxes, image_shapes=image_shapes)
 
         # Flatten the ROI features
         rois = rois.view(rois.size(0), -1)
