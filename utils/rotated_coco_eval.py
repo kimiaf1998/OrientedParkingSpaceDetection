@@ -24,8 +24,8 @@ from pycocotools.coco import COCO
 from .Rotatedcoco import RotatedCOCO
 import pycocotools.mask as mask_util
 from .coco_eval import CocoEvaluator, evaluate
-from util.box_ops import polygon_box_iou
-from util.misc import all_gather
+from utils.box_ops import polygon_box_iou
+from utils.misc import all_gather
 
 class RotatedCocoEvaluator(CocoEvaluator):
     """
