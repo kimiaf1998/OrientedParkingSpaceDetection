@@ -41,14 +41,15 @@ class FasterRCNN_FPN(nn.Module):
         self.classification_head = nn.Linear(num_outputs, num_classes)
         self.regression_head = nn.Linear(num_outputs, 4 * num_classes)
 
-    def forward(self, x, boxes):
+    def forward(self, x, target):
         # Extract features from the backbone
         features = self.backbone(x)
+        print("image shape : ", x.shape)
 
         image_shapes = [(image.shape[1], image.shape[2]) for image in x]
 
         # Generate features for each ROI
-        rois = self.roi_pooling(features, boxes, image_shapes=image_shapes)
+        rois = self.roi_pooling(features, target['boxes'], image_shapes=image_shapes)
 
         # Flatten the ROI features
         rois = rois.view(rois.size(0), -1)
