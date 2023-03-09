@@ -24,7 +24,7 @@ class FasterRCNN_FPN(nn.Module):
     This is an extended version of a Faster R-CNN for rotated
     boxes with the shape of (x1, y1, x2, y2, x3, y3, x4, y4)
     """
-    def __init__(self, num_classes, num_outputs=8):
+    def __init__(self, num_classes=2, num_outputs=8):
         super(FasterRCNN_FPN, self).__init__()
 
         # Load the pre-trained FPN backbone
