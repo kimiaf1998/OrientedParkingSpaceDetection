@@ -59,7 +59,7 @@ def preprocess(images, rois=None, device=None, res=None):
         #     res_rois.append(new_rois)
         res_images.append(image)
 
-    return res_images, rois
+    return torch.stack(res_images, dim=0), rois
 
 
 def crop(image, target, region):
