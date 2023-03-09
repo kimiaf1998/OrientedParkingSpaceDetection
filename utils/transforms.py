@@ -33,7 +33,7 @@ def preprocess(images, rois=None, device=None, res=None):
         # resize image to model input size
         if res is not None:
             _, orig_he, orig_w = image.shape
-            image = TF.resize(image, res)
+            image = F.resize(image, res)
             # correct rois for image size given
             _, new_h, new_w = image.shape
             if rois is not None:
