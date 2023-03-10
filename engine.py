@@ -43,12 +43,10 @@ def train_one_epoch(model, optimizer, data_loader, resolution, device, epoch, pr
         #assert torch.isnan(outputs).sum() == 0, print(outputs)
         # augment data
         # images, targets = transforms.augment(images, targets)
-        print("images: ", images)
 
         # preprocess image
         res_images, res_rois = transforms.preprocess(images, rois=[t["boxes"] for t in targets], device=device,
                                                      res=resolution)
-        print("res_images: ", res_images)
         # update boxed according to the new resolution
         new_target = []
         for idx, target in enumerate(targets):
@@ -58,7 +56,7 @@ def train_one_epoch(model, optimizer, data_loader, resolution, device, epoch, pr
         targets = new_target
 
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            loss_dict, _ = model(res_images, targets)
+            loss_dict, _ = model(torch.stack(res_images), targets)
             losses = sum(loss for loss in loss_dict.values())
 
         # reduce losses over all GPUs for logging purposes
