@@ -12,6 +12,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrc
 from collections import OrderedDict
 import torchvision.models as models
 import torchvision.ops as ops
+from torchvision.ops import FeaturePyramidNetwork
 
 
 class FasterRCNN_FPN(nn.Module):
@@ -32,10 +33,9 @@ class FasterRCNN_FPN(nn.Module):
 
         # Load the pre-trained Resnet 50 + FPN backbone
         self.backbone = models.resnet50(pretrained=True)
-        self.fpn = models.detection.FPN(
+        self.fpn = FeaturePyramidNetwork(
             in_channels_list=[256, 512, 1024, 2048],
-            out_channels=256,
-            top_blocks=None
+            out_channels=256
         )
         # out_channels = self.backbone.out_channels
         out_channels = 256
