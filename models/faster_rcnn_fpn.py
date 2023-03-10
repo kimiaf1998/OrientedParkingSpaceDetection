@@ -5,6 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.hub import load_state_dict_from_url
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, retinanet_resnet50_fpn, RetinaNet_ResNet50_FPN_Weights
+from torchvision.models.detection.image_list import ImageList
 from torchvision.models.detection.rpn import RegionProposalNetwork, RPNHead
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrcnn_resnet50_fpn_v2, _default_anchorgen, \
@@ -93,7 +94,9 @@ class FasterRCNN_FPN(nn.Module):
             )
             original_image_sizes.append((val[0], val[1]))
 
-        images, targets = self.transform(images, targets)
+        # images, targets = self.transform(images, targets)
+
+        images = ImageList(images, original_image_sizes)
 
         # Extract features from the backbone
         features = self.backbone(images.tensors)
