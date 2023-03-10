@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.hub import load_state_dict_from_url
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection import fasterrcnn_resnet50_fpn, retinanet_resnet50_fpn, RetinaNet_ResNet50_FPN_Weights
 from torchvision.models.detection.rpn import RegionProposalNetwork, RPNHead
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrcnn_resnet50_fpn_v2, _default_anchorgen, \
@@ -28,7 +28,8 @@ class FasterRCNN_FPN(nn.Module):
         super(FasterRCNN_FPN, self).__init__()
 
         # Load the pre-trained FPN backbone
-        self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
+        # self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
+        self.backbone = retinanet_resnet50_fpn(weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT)
         out_channels = self.backbone.out_channels
 
         # Add the RPN network
