@@ -29,10 +29,10 @@ class FasterRCNN_FPN(nn.Module):
         super(FasterRCNN_FPN, self).__init__()
 
         # Load the pre-trained FPN backbone
-        # self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
+        self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
 
         # Load the pre-trained Resnet 50 + FPN backbone
-        self.backbone = models.resnet50(pretrained=True)
+        # self.backbone = models.resnet50(pretrained=True)
         self.fpn = FeaturePyramidNetwork(
             in_channels_list=[256, 512, 1024, 2048],
             out_channels=256
@@ -99,8 +99,8 @@ class FasterRCNN_FPN(nn.Module):
         # for key in features:
         #     features[key] = features[key].unsqueeze(0)
 
-        fpn_features = self.fpn(features)
-        print("fpn_features : ", fpn_features)
+        # fpn_features = self.fpn(features)
+        # print("fpn_features : ", fpn_features)
 
         # Extract region proposals per image
         proposals, proposal_losses = self.rpn(images, fpn_features, targets)
