@@ -56,7 +56,7 @@ def train_one_epoch(model, optimizer, data_loader, resolution, device, epoch, pr
         targets = new_target
 
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            loss_dict = model(res_images, targets)
+            loss_dict, _ = model(res_images, targets)
             losses = sum(loss for loss in loss_dict.values())
 
         # reduce losses over all GPUs for logging purposes
@@ -142,7 +142,7 @@ def evaluate(model, data_loader, resolution, log_dir, device):
 
         if torch.cuda.is_available():
             torch.cuda.synchronize()
-        outputs = model(res_images)
+        losses, outputs = model(res_images)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 
