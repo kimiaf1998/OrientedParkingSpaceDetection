@@ -103,7 +103,7 @@ class FasterRCNN_FPN(nn.Module):
         # print("fpn_features : ", fpn_features)
 
         # Extract region proposals per image
-        proposals, proposal_losses = self.rpn(images, features, targets)
+        proposals, proposal_losses = self.rpn(images.tolist(), features, targets)
         # Generate features for each ROI
         box_features = self.roi_pooling(features, proposals, image_shapes=original_image_sizes)
 
