@@ -29,7 +29,7 @@ class FasterRCNN_FPN(nn.Module):
 
         # Load the pre-trained FPN backbone
         # self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
-        self.backbone = retinanet_resnet50_fpn(weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT)
+        self.backbone = retinanet_resnet50_fpn(weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT).features
         out_channels = self.backbone.out_channels
 
         # Add the RPN network
@@ -84,7 +84,7 @@ class FasterRCNN_FPN(nn.Module):
         # images, targets = self.transform(images, targets)
 
         # Extract features from the backbone
-        features = self.backbone(images).features
+        features = self.backbone(images)
 
         # Extract region proposals per image
         proposals, proposal_losses = self.rpn(images, features, targets)
