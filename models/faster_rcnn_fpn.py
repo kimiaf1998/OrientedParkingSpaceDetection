@@ -156,18 +156,18 @@ class FastRCNNPredictor(nn.Module):
 
 def create_RPN(in_channels):
     # RPN parameters
-    rpn_anchor_generator = _default_anchorgen(),
+    rpn_anchor_generator = _default_anchorgen()
     rpn_head = RPNHead(in_channels, rpn_anchor_generator.num_anchors_per_location()[0])
-    rpn_pre_nms_top_n_train = 2000,
-    rpn_pre_nms_top_n_test = 1000,
-    rpn_post_nms_top_n_train = 2000,
-    rpn_post_nms_top_n_test = 1000,
-    rpn_nms_thresh = 0.7,
-    rpn_fg_iou_thresh = 0.7,
-    rpn_bg_iou_thresh = 0.3,
-    rpn_batch_size_per_image = 256,
-    rpn_positive_fraction = 0.5,
-    rpn_score_thresh = 0.0,
+    rpn_pre_nms_top_n_train = 2000
+    rpn_pre_nms_top_n_test = 1000
+    rpn_post_nms_top_n_train = 2000
+    rpn_post_nms_top_n_test = 1000
+    rpn_nms_thresh = 0.7
+    rpn_fg_iou_thresh = 0.7
+    rpn_bg_iou_thresh = 0.3
+    rpn_batch_size_per_image = 256
+    rpn_positive_fraction = 0.5
+    rpn_score_thresh = 0.0
 
     rpn_pre_nms_top_n = dict(training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
     rpn_post_nms_top_n = dict(training=rpn_post_nms_top_n_train, testing=rpn_post_nms_top_n_test)
