@@ -29,8 +29,16 @@ class FasterRCNN_FPN(nn.Module):
 
         # Load the pre-trained FPN backbone
         # self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
-        self.backbone = retinanet_resnet50_fpn(weights=RetinaNet_ResNet50_FPN_Weights.DEFAULT).features
-        out_channels = self.backbone.out_channels
+
+        # Load the pre-trained Resnet 50 + FPN backbone
+        self.backbone = models.resnet50(pretrained=True)
+        self.fpn = models.detection.FPN(
+            in_channels_list=[256, 512, 1024, 2048],
+            out_channels=256,
+            top_blocks=None
+        )
+        # out_channels = self.backbone.out_channels
+        out_channels = 256
 
         # Add the RPN network
         self.rpn = create_RPN(out_channels)
@@ -85,9 +93,11 @@ class FasterRCNN_FPN(nn.Module):
 
         # Extract features from the backbone
         features = self.backbone(images)
+        features = OrderedDict([(k, features[k]) for k in ['layer1', 'layer2', 'layer3', 'layer4']])
+        fpn_features = self.fpn(features)
 
         # Extract region proposals per image
-        proposals, proposal_losses = self.rpn(images, features, targets)
+        proposals, proposal_losses = self.rpn(images, fpn_features, targets)
         # Generate features for each ROI
         box_features = self.roi_pooling(features, proposals, image_shapes=original_image_sizes)
 
