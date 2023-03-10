@@ -95,7 +95,7 @@ class FasterRCNN_FPN(nn.Module):
             original_image_sizes.append((val[0], val[1]))
 
         # images, targets = self.transform(images, targets)
-
+        print("original_image_sizes : ", original_image_sizes)
         images = ImageList(images, original_image_sizes)
 
         # Extract features from the backbone
