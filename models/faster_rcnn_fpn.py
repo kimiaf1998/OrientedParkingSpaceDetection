@@ -93,7 +93,7 @@ class FasterRCNN_FPN(nn.Module):
 
         # Extract features from the backbone
         features = self.backbone(images)
-        print("features : ", features)
+        # print("features : ", features)
 
         # Add a batch dimension to the features dictionary
         # for key in features:
@@ -103,7 +103,7 @@ class FasterRCNN_FPN(nn.Module):
         # print("fpn_features : ", fpn_features)
 
         # Extract region proposals per image
-        proposals, proposal_losses = self.rpn(images, fpn_features, targets)
+        proposals, proposal_losses = self.rpn(images, features, targets)
         # Generate features for each ROI
         box_features = self.roi_pooling(features, proposals, image_shapes=original_image_sizes)
 
