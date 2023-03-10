@@ -1,16 +1,15 @@
+from typing import List, Dict, Tuple
+
+import torch
 from torch import nn
+import torch.nn.functional as F
 from torch.hub import load_state_dict_from_url
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection.rpn import RegionProposalNetwork, RPNHead
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrcnn_resnet50_fpn_v2
-
-from .utils import pooling
-from .utils.class_head import ClassificationHead
-
-import torch.nn as nn
-import torchvision.models as models
-
-import torch.nn as nn
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrcnn_resnet50_fpn_v2, _default_anchorgen, \
+    TwoMLPHead
+from collections import OrderedDict
 import torchvision.models as models
 import torchvision.ops as ops
 
@@ -24,49 +23,232 @@ class FasterRCNN_FPN(nn.Module):
     This is an extended version of a Faster R-CNN for rotated
     boxes with the shape of (x1, y1, x2, y2, x3, y3, x4, y4)
     """
+
     def __init__(self, num_classes=2, num_outputs=8):
         super(FasterRCNN_FPN, self).__init__()
 
         # Load the pre-trained FPN backbone
         self.backbone = resnet_fpn_backbone('resnet50', pretrained=True)
+        out_channels = self.backbone.out_channels
+
+        # Add the RPN network
+        self.rpn = create_RPN(out_channels)
 
         # Add the ROI pooling layer
         self.roi_pooling = ops.MultiScaleRoIAlign(featmap_names=['0', '1', '2', '3'], output_size=7, sampling_ratio=2)
+        resolution = self.roi_pooling.output_size[0]
 
         # Add 2 fully connected layers on top of the ROI pooling layer
-        self.fc1 = nn.Linear(256 * 7 * 7, 1024)
-        self.fc2 = nn.Linear(1024, num_outputs)
+        self.box_head = TwoMLPHead(out_channels * resolution ** 2, 1024)
 
-        # Add the classification and regression heads
-        self.classification_head = nn.Linear(num_outputs, num_classes)
-        self.regression_head = nn.Linear(num_outputs, 4 * num_classes)
+        # Add the FastRCNN box predictor (classification and regression heads
+        self.box_predictor = FastRCNNPredictor(1024, num_classes)
 
-    def forward(self, x, target):
+    def forward(self, images, targets):
+        # type: (List[Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[Dict[str, Tensor], List[Dict[str, Tensor]]]
+        """
+        Args:
+            images (list[Tensor]): images to be processed
+            targets (list[Dict[str, Tensor]]): ground-truth boxes present in the image (optional)
+        Returns:
+            result (list[BoxList] or dict[Tensor]): the output from the model.
+                During training, it returns a dict[Tensor] which contains the losses.
+                During testing, it returns list[BoxList] contains additional fields
+                like `scores`, `labels` and `mask` (for Mask R-CNN models).
+        """
+
+        if self.training:
+            if targets is None:
+                torch._assert(False, "targets should not be none when in training mode")
+            else:
+                for target in targets:
+                    boxes = target["boxes"]
+                    if isinstance(boxes, torch.Tensor):
+                        torch._assert(
+                            len(boxes.shape) == 2 and boxes.shape[-1] == 8,
+                            f"Expected target boxes to be a tensor of shape [N, 8], got {boxes.shape}.",
+                        )
+                    else:
+                        torch._assert(False, f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
+
+        original_image_sizes: List[Tuple[int, int]] = []
+        for img in images:
+            val = img.shape[-2:]
+            torch._assert(
+                len(val) == 2,
+                f"expecting the last two dimensions of the Tensor to be H and W instead got {img.shape[-2:]}",
+            )
+            original_image_sizes.append((val[0], val[1]))
+
+        # images, targets = self.transform(images, targets)
+
         # Extract features from the backbone
-        features = self.backbone(x)
-        print("image shape : ", x.shape)
+        features = self.backbone(images.tensors)
 
-        image_shapes = [(image.shape[1], image.shape[2]) for image in x]
-
+        # Extract region proposals per image
+        proposals, proposal_losses = self.rpn(images, features, targets)
         # Generate features for each ROI
-        rois = self.roi_pooling(features, target['boxes'], image_shapes=image_shapes)
-
-        # Flatten the ROI features
-        rois = rois.view(rois.size(0), -1)
+        box_features = self.roi_pooling(features, proposals, image_shapes=original_image_sizes)
 
         # Pass the ROI features through the fully connected layers
-        x = self.fc1(rois)
-        x = nn.functional.relu(x)
-        x = self.fc2(x)
+        box_features = self.box_head(box_features)
 
         # Pass the ROI features through the classification and regression heads
-        classifications = self.classification_head(x)
-        regressions = self.regression_head(x)
+        class_logits, box_regression = self.box_predictor(box_features)
 
-        return classifications, regressions
+        labels = [t['labels'] for t in targets]
+        regression_targets = [t['boxes'] for t in targets]
+
+        detections: List[Dict[str, torch.Tensor]] = []
+        detector_losses = {}
+        if self.training:
+            if labels is None:
+                raise ValueError("labels cannot be None")
+            if regression_targets is None:
+                raise ValueError("regression_targets cannot be None")
+            loss_classifier, loss_box_reg = fastrcnn_loss(class_logits, box_regression, labels, regression_targets)
+            detector_losses = {"loss_classifier": loss_classifier, "loss_box_reg": loss_box_reg}
+        else:
+            boxes, scores, labels = self.postprocess_detections(class_logits, box_regression, proposals,
+                                                                original_image_sizes)  # TODO
+            num_images = len(boxes)
+            for i in range(num_images):
+                detections.append(
+                    {
+                        "boxes": boxes[i],
+                        "labels": labels[i],
+                        "scores": scores[i],
+                    }
+                )
+        losses = {}
+        losses.update(detector_losses)
+        losses.update(proposal_losses)
+
+        return losses, detections
+
+
+class FastRCNNPredictor(nn.Module):
+    """
+    Standard classification + bounding box regression layers
+    for Fast R-CNN.
+    Args:
+        in_channels (int): number of input channels
+        num_classes (int): number of output classes (including background)
+    """
+
+    def __init__(self, in_channels, num_classes):
+        super().__init__()
+        self.cls_score = nn.Linear(in_channels, num_classes)
+        self.bbox_pred = nn.Linear(in_channels, num_classes * 8)
+
+    def forward(self, x):
+        # if x.dim() == 4:
+        #     torch._assert(
+        #         list(x.shape[2:]) == [1, 1],
+        #         f"x has the wrong shape, expecting the last two dimensions to be [1,1] instead of {list(x.shape[2:])}",
+        #     )
+        x = x.flatten(start_dim=1)
+        scores = self.cls_score(x)
+        bbox_deltas = self.bbox_pred(x)
+
+        return scores, bbox_deltas
+
+
+def create_RPN(in_channels):
+    # RPN parameters
+    rpn_anchor_generator = _default_anchorgen(),
+    rpn_head = RPNHead(in_channels, rpn_anchor_generator.num_anchors_per_location()[0])
+    rpn_pre_nms_top_n_train = 2000,
+    rpn_pre_nms_top_n_test = 1000,
+    rpn_post_nms_top_n_train = 2000,
+    rpn_post_nms_top_n_test = 1000,
+    rpn_nms_thresh = 0.7,
+    rpn_fg_iou_thresh = 0.7,
+    rpn_bg_iou_thresh = 0.3,
+    rpn_batch_size_per_image = 256,
+    rpn_positive_fraction = 0.5,
+    rpn_score_thresh = 0.0,
+
+    rpn_pre_nms_top_n = dict(training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
+    rpn_post_nms_top_n = dict(training=rpn_post_nms_top_n_train, testing=rpn_post_nms_top_n_test)
+
+    return RegionProposalNetwork(
+        rpn_anchor_generator,
+        rpn_head,
+        rpn_fg_iou_thresh,
+        rpn_bg_iou_thresh,
+        rpn_batch_size_per_image,
+        rpn_positive_fraction,
+        rpn_pre_nms_top_n,
+        rpn_post_nms_top_n,
+        rpn_nms_thresh,
+        score_thresh=rpn_score_thresh,
+    )
+
+
+def postprocess_detections(
+        self,
+        class_logits,  # type: Tensor
+        box_regression,  # type: Tensor
+        proposals,  # type: List[Tensor]
+        image_shapes,  # type: List[Tuple[int, int]]
+):
+    # type: (...) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]
+    device = class_logits.device
+    num_classes = class_logits.shape[-1]
+    box_ops = ops.boxes
+
+    boxes_per_image = [boxes_in_image.shape[0] for boxes_in_image in proposals]
+    pred_boxes = self.box_coder.decode(box_regression, proposals)
+
+    pred_scores = F.softmax(class_logits, -1)
+
+    pred_boxes_list = pred_boxes.split(boxes_per_image, 0)
+    pred_scores_list = pred_scores.split(boxes_per_image, 0)
+
+    all_boxes = []
+    all_scores = []
+    all_labels = []
+    for boxes, scores, image_shape in zip(pred_boxes_list, pred_scores_list, image_shapes):
+        boxes = box_ops.clip_boxes_to_image(boxes, image_shape)
+
+        # create labels for each prediction
+        labels = torch.arange(num_classes, device=device)
+        labels = labels.view(1, -1).expand_as(scores)
+
+        # remove predictions with the background label
+        boxes = boxes[:, 1:]
+        scores = scores[:, 1:]
+        labels = labels[:, 1:]
+
+        # batch everything, by making every class prediction be a separate instance
+        boxes = boxes.reshape(-1, 4)
+        scores = scores.reshape(-1)
+        labels = labels.reshape(-1)
+
+        # remove low scoring boxes
+        inds = torch.where(scores > self.score_thresh)[0]
+        boxes, scores, labels = boxes[inds], scores[inds], labels[inds]
+
+        # remove empty boxes
+        keep = box_ops.remove_small_boxes(boxes, min_size=1e-2)
+        boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+
+        # non-maximum suppression, independently done per class
+        keep = box_ops.batched_nms(boxes, scores, labels, self.nms_thresh)
+        # keep only topk scoring predictions
+        keep = keep[: self.detections_per_img]
+        boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+
+        all_boxes.append(boxes)
+        all_scores.append(scores)
+        all_labels.append(labels)
+
+    return all_boxes, all_scores, all_labels
 
 
 # class FasterRCNN_FPN(nn.Module):
+
 #     """
 #     A Faster R-CNN FPN inspired parking lot classifier.
 #     Passes the whole image through a CNN -->
@@ -128,4 +310,39 @@ def create_model():
     return model
 
 
+def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
+    # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]
+    """
+    Computes the loss for Faster R-CNN.
+    Args:
+        class_logits (Tensor)
+        box_regression (Tensor)
+        labels (list[BoxList])
+        regression_targets (Tensor)
+    Returns:
+        classification_loss (Tensor)
+        box_loss (Tensor)
+    """
 
+    labels = torch.cat(labels, dim=0)
+    regression_targets = torch.cat(regression_targets, dim=0)
+
+    classification_loss = F.cross_entropy(class_logits, labels)
+
+    # get indices that correspond to the regression targets for
+    # the corresponding ground truth labels, to be used with
+    # advanced indexing
+    sampled_pos_inds_subset = torch.where(labels > 0)[0]
+    labels_pos = labels[sampled_pos_inds_subset]
+    N, num_classes = class_logits.shape
+    box_regression = box_regression.reshape(N, box_regression.size(-1) // 4, 4)
+
+    box_loss = F.smooth_l1_loss(
+        box_regression[sampled_pos_inds_subset, labels_pos],
+        regression_targets[sampled_pos_inds_subset],
+        beta=1 / 9,
+        reduction="sum",
+    )
+    box_loss = box_loss / labels.numel()
+
+    return classification_loss, box_loss
