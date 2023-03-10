@@ -93,7 +93,12 @@ class FasterRCNN_FPN(nn.Module):
 
         # Extract features from the backbone
         features = self.backbone(images)
-        features = OrderedDict([(k, features[k]) for k in ['layer1', 'layer2', 'layer3', 'layer4']])
+        print("features : ", features)
+
+        # Add a batch dimension to the features dictionary
+        for key in features:
+            features[key] = features[key].unsqueeze(0)
+
         fpn_features = self.fpn(features)
 
         # Extract region proposals per image
