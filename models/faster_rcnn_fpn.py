@@ -12,6 +12,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrc
 from collections import OrderedDict
 import torchvision.models as models
 import torchvision.ops as ops
+from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops import FeaturePyramidNetwork
 
 
@@ -53,6 +54,9 @@ class FasterRCNN_FPN(nn.Module):
         # Add the FastRCNN box predictor (classification and regression heads
         self.box_predictor = FastRCNNPredictor(1024, num_classes)
 
+        self.transform = GeneralizedRCNNTransform(min_size=800, max_size=1333,
+                                                  image_mean=[0.485, 0.456, 0.406], image_std=[0.229, 0.224, 0.225])
+
     def forward(self, images, targets):
         # type: (List[Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[Dict[str, Tensor], List[Dict[str, Tensor]]]
         """
@@ -89,7 +93,7 @@ class FasterRCNN_FPN(nn.Module):
             )
             original_image_sizes.append((val[0], val[1]))
 
-        # images, targets = self.transform(images, targets)
+        images, targets = self.transform(images, targets)
 
         # Extract features from the backbone
         features = self.backbone(images)
@@ -103,7 +107,7 @@ class FasterRCNN_FPN(nn.Module):
         # print("fpn_features : ", fpn_features)
 
         # Extract region proposals per image
-        proposals, proposal_losses = self.rpn(images.tolist(), features, targets)
+        proposals, proposal_losses = self.rpn(images, features, targets)
         # Generate features for each ROI
         box_features = self.roi_pooling(features, proposals, image_shapes=original_image_sizes)
 
