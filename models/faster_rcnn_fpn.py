@@ -96,7 +96,7 @@ class FasterRCNN_FPN(nn.Module):
         images, targets = self.transform(images, targets)
 
         # Extract features from the backbone
-        features = self.backbone(images)
+        features = self.backbone(images.tensors)
         # print("features : ", features)
 
         # Add a batch dimension to the features dictionary
